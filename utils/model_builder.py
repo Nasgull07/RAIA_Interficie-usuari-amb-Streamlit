@@ -101,15 +101,12 @@ def train_model(X_train, y_train, X_val, y_val, epochs=10, batch_size=128):
     # Callbacks
     callbacks = [
         keras.callbacks.EarlyStopping(
-            monitor='val_loss',
             patience=3,
             restore_best_weights=True
         ),
         keras.callbacks.ReduceLROnPlateau(
-            monitor='val_loss',
             factor=0.5,
-            patience=2,
-            min_lr=0.00001
+            patience=2
         )
     ]
     
@@ -120,112 +117,125 @@ def train_model(X_train, y_train, X_val, y_val, epochs=10, batch_size=128):
         epochs=epochs,
         batch_size=batch_size,
         callbacks=callbacks,
-        verbose=0
+        verbose=1
     )
     
+    # Guardar modelo
+    MODEL_DIR.mkdir(exist_ok=True)
+    model.save(MODEL_PATH)
+    
+    # Guardar información del modelo
+    model_info = {
+        'num_classes': 26,
+        'input_shape': [28, 28, 1],
+        'epochs_trained': len(history.history['loss']),
+        'train_accuracy': float(history.history['accuracy'][-1]),
+        'val_accuracy': float(history.history['val_accuracy'][-1]),
+        'model_type': 'cnn'
+    }
+    
+    with open(MODEL_INFO_PATH, 'w') as f:
+        json.dump(model_info, f, indent=2)
+    
     return model, history
+
+def save_model(model, history):
+    """
+    Guarda el modelo entrenado
+    
+    Args:
+        model: Modelo keras
+        history: Historial de entrenamiento
+    """
+    MODEL_DIR.mkdir(exist_ok=True)
+    model.save(MODEL_PATH)
+
+def predict_letter(model_input, image):
+    """
+    Predice la letra de una imagen
+    
+    Args:
+        model_input: Modelo o tupla (modelo, _) para compatibilidad
+        image: Array numpy de la imagen (28x28)
+    
+    Returns:
+        tuple: (letra predicha, probabilidades)
+    """
+    # Manejar si recibe tupla (compatibilidad)
+    if isinstance(model_input, tuple):
+        model = model_input[0]
+    else:
+        model = model_input
+    
+    if not TF_AVAILABLE or model is None:
+        return None, {}
+    
+    # Preparar imagen
+    if len(image.shape) == 2:
+        image = image.reshape(1, 28, 28, 1)
+    elif len(image.shape) == 3:
+        image = image.reshape(1, 28, 28, 1)
+    
+    # Predecir
+    predictions = model.predict(image, verbose=0)[0]
+    predicted_class = np.argmax(predictions)
+    
+    # Convertir a letra (0-25 -> A-Z)
+    predicted_letter = chr(65 + predicted_class)
+    
+    # Crear diccionario de probabilidades
+    probs_dict = {}
+    for i, prob in enumerate(predictions):
+        letter = chr(65 + i)
+        probs_dict[letter] = float(prob)
+    
+    return predicted_letter, probs_dict
 
 @st.cache_resource
 def load_model():
     """
     Carga el modelo guardado
-    Elemento: CACHE DE RECURSOS - El modelo persiste en memoria
+    Elemento: CACHE DE RECURSOS - El modelo se cachea en memoria
     
     Returns:
         keras.Model o None
     """
-    if not TF_AVAILABLE:
-        return None
-    
-    if MODEL_PATH.exists():
-        try:
-            model = keras.models.load_model(MODEL_PATH)
-            return model
-        except Exception as e:
-            st.error(f"Error al cargar modelo: {str(e)}")
+    try:
+        if not TF_AVAILABLE:
             return None
-    else:
-        return None
-
-def save_model(model, history=None):
-    """
-    Guarda el modelo y su información
-    Elemento: PERSISTENCIA DE DATOS
-    
-    Args:
-        model: Modelo de Keras
-        history: Historial de entrenamiento
-    """
-    MODEL_DIR.mkdir(exist_ok=True)
-    
-    # Guardar modelo
-    model.save(MODEL_PATH)
-    
-    # Guardar información del modelo
-    if history is not None:
-        model_info = {
-            'accuracy': float(history.history['accuracy'][-1]),
-            'val_accuracy': float(history.history['val_accuracy'][-1]),
-            'loss': float(history.history['loss'][-1]),
-            'val_loss': float(history.history['val_loss'][-1]),
-            'epochs_trained': len(history.history['accuracy'])
-        }
         
-        with open(MODEL_INFO_PATH, 'w') as f:
-            json.dump(model_info, f, indent=2)
+        if not MODEL_PATH.exists():
+            return None
+        
+        model = keras.models.load_model(MODEL_PATH)
+        return model
     
-    # Limpiar cache para forzar recarga
-    load_model.clear()
-
-def get_model_info():
-    """
-    Obtiene información del modelo guardado
-    
-    Returns:
-        dict con información del modelo
-    """
-    if MODEL_INFO_PATH.exists():
-        with open(MODEL_INFO_PATH, 'r') as f:
-            return json.load(f)
-    return None
-
-def predict_letter(model, image):
-    """
-    Predice la letra de una imagen
-    
-    Args:
-        model: Modelo de Keras
-        image: Imagen 28x28
-    
-    Returns:
-        tuple: (letra_predicha, probabilidades)
-    """
-    if model is None:
-        return None, None
-    
-    # Preparar imagen
-    if len(image.shape) == 2:
-        image = image.reshape(1, 28, 28, 1)
-    elif len(image.shape) == 3 and image.shape[2] == 1:
-        image = image.reshape(1, 28, 28, 1)
-    
-    # Predecir
-    predictions = model.predict(image, verbose=0)
-    predicted_class = np.argmax(predictions[0])
-    
-    # Convertir a letra (añadir 1 porque EMNIST usa 1-26)
-    predicted_letter = chr(65 + predicted_class)  # A-Z
-    
-    # Probabilidades para todas las letras
-    probabilities = {chr(65 + i): float(predictions[0][i]) for i in range(26)}
-    
-    return predicted_letter, probabilities
+    except Exception as e:
+        st.error(f"Error al cargar modelo: {str(e)}")
+        return None
 
 def model_exists():
-    """
-    Verifica si existe un modelo guardado
-    
-    Returns:
-        bool
-    """
+    """Verifica si existe un modelo entrenado"""
     return MODEL_PATH.exists()
+
+def get_model_info():
+    """Obtiene información del modelo guardado"""
+    try:
+        if MODEL_INFO_PATH.exists():
+            with open(MODEL_INFO_PATH, 'r') as f:
+                return json.load(f)
+        return None
+    except:
+        return None
+
+def delete_model():
+    """Elimina el modelo guardado"""
+    try:
+        if MODEL_PATH.exists():
+            MODEL_PATH.unlink()
+        if MODEL_INFO_PATH.exists():
+            MODEL_INFO_PATH.unlink()
+        return True
+    except Exception as e:
+        st.error(f"Error al eliminar modelo: {str(e)}")
+        return False

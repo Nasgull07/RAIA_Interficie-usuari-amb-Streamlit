@@ -1,7 +1,12 @@
 {
-  "accuracy": 0.7810465097427368,
-  "val_accuracy": 0.8528571724891663,
-  "loss": 0.6865154504776001,
-  "val_loss": 0.4521694481372833,
-  "epochs_trained": 4
+  "num_classes": 26,
+  "input_shape": [
+    28,
+    28,
+    1
+  ],
+  "epochs_trained": 20,
+  "train_accuracy": 0.9334942102432251,
+  "val_accuracy": 0.9389241337776184,
+  "model_type": "cnn"
 }

@@ -145,7 +145,7 @@ with tab1:
             
             # Confianza
             confidence = result['probabilities'][result['letter']] * 100
-            st.progress(confidence / 100)
+            st.progress(float(confidence / 100))
             st.caption(f"Confianza: {confidence:.2f}%")
             
             # Top 5 predicciones

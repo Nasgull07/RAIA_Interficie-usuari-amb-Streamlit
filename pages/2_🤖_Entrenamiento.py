@@ -84,6 +84,16 @@ with st.sidebar:
             st.metric("Épocas previas", model_info['epochs_trained'])
         
         st.warning("⚠️ Entrenar sobrescribirá el modelo actual")
+        
+        # Botón para eliminar modelo
+        if st.button("🗑️ Eliminar Modelo", type="secondary", use_container_width=True):
+            from utils.model_builder import delete_model
+            if delete_model():
+                st.success("✅ Modelo eliminado correctamente")
+                st.cache_resource.clear()
+                st.rerun()
+            else:
+                st.error("❌ Error al eliminar el modelo")
     else:
         st.info("ℹ️ No hay modelo previo")
 

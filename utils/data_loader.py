@@ -34,11 +34,12 @@ def load_train_data(sample_size=None):
             st.error(f"No se encontró el archivo: {TRAIN_FILE}")
             return None, None
         
-        # Cargar dataset
-        if sample_size:
-            df = pd.read_csv(TRAIN_FILE, nrows=sample_size)
-        else:
-            df = pd.read_csv(TRAIN_FILE)
+        # Cargar dataset completo primero
+        df = pd.read_csv(TRAIN_FILE)
+        
+        # Si se especifica sample_size, tomar muestras ALEATORIAS sin repetición
+        if sample_size and sample_size < len(df):
+            df = df.sample(n=sample_size, random_state=42, replace=False)
         
         # Separar etiquetas y características
         y = df.iloc[:, 0].values  # Primera columna son las etiquetas
@@ -46,6 +47,10 @@ def load_train_data(sample_size=None):
         
         # Reshape a formato de imagen 28x28
         X = X.reshape(-1, 28, 28)
+        
+        # IMPORTANTE: EMNIST viene rotado -90° (girado a la izquierda)
+        # Corrección: rotar 90° a la derecha (k=-1 o k=3) y voltear horizontalmente
+        X = np.array([np.fliplr(np.rot90(img, k=-1)) for img in X])
         
         # Normalizar píxeles a rango [0, 1]
         X = X.astype('float32') / 255.0
@@ -73,15 +78,22 @@ def load_test_data(sample_size=None):
             st.error(f"No se encontró el archivo: {TEST_FILE}")
             return None, None
         
-        if sample_size:
-            df = pd.read_csv(TEST_FILE, nrows=sample_size)
-        else:
-            df = pd.read_csv(TEST_FILE)
+        # Cargar dataset completo
+        df = pd.read_csv(TEST_FILE)
+        
+        # Si se especifica sample_size, tomar muestras ALEATORIAS sin repetición
+        if sample_size and sample_size < len(df):
+            df = df.sample(n=sample_size, random_state=42, replace=False)
         
         y = df.iloc[:, 0].values
         X = df.iloc[:, 1:].values
         
         X = X.reshape(-1, 28, 28)
+        
+        # IMPORTANTE: EMNIST viene rotado -90° (girado a la izquierda)
+        # Corrección: rotar 90° a la derecha (k=-1 o k=3) y voltear horizontalmente
+        X = np.array([np.fliplr(np.rot90(img, k=-1)) for img in X])
+        
         X = X.astype('float32') / 255.0
         
         return X, y
